@@ -1,4 +1,6 @@
+// DualSnakeGame.tsx
 import React, { useEffect, useRef, useState } from 'react';
+import { socket } from './socket';
 
 type GameState = {
   player_snake: [number, number][],
@@ -11,40 +13,41 @@ type GameState = {
   grid_height: number,
 };
 
-const CELL_SIZE = 20;      // Each grid cell is 20x20 pixels
-const EXTRA_HEIGHT = 30;   // Extra space at bottom for text
-const ip_and_port = 'put_urs_here_dont_forget_the_slash->/';
+const CELL_SIZE = 20;      // Each grid cell is 20x20 pixels.
+const EXTRA_HEIGHT = 30;   // Extra space at bottom for text.
 
 const DualSnakeGame: React.FC = () => {
   const playerCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const aiCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
 
-  // Poll the game state from the backend.
-  const fetchGameState = async () => {
-    try {
-      const response = await fetch(ip_and_port + 'state');
-      const state: GameState = await response.json();
+  // Listen for game state updates from the server.
+  useEffect(() => {
+    socket.on('game_state', (state: GameState) => {
+      console.log('recieved game state')
       setGameState(state);
-    } catch (error) {
-      console.error('Error fetching game state:', error);
-    }
-  };
+    });
+    return () => {
+      socket.off('game_state');
+    };
+  }, []);
 
-  // Send player direction change.
-  const sendDirection = async (direction: string) => {
-    try {
-      await fetch(ip_and_port + 'change_direction', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ direction }),
-      });
-    } catch (error) {
-      console.error('Error sending direction:', error);
-    }
-  };
+  // Listen for arrow key events and send direction events over the socket.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      let direction = '';
+      if (event.key === 'ArrowUp') direction = 'UP';
+      else if (event.key === 'ArrowDown') direction = 'DOWN';
+      else if (event.key === 'ArrowLeft') direction = 'LEFT';
+      else if (event.key === 'ArrowRight') direction = 'RIGHT';
+      if (direction) {
+        socket.emit('change_direction', { direction });
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
-  // Draw a canvas for the given snake, apple, and label.
   const drawCanvas = (
     canvas: HTMLCanvasElement,
     snake: [number, number][],
@@ -64,17 +67,17 @@ const DualSnakeGame: React.FC = () => {
       ctx.lineWidth = 2;
       ctx.strokeRect(0, 0, width, height);
 
-      // Draw the snake.
+      // Draw snake.
       ctx.fillStyle = label === "Player" ? 'green' : 'blue';
       snake.forEach(cell => {
         ctx.fillRect(cell[0] * CELL_SIZE, cell[1] * CELL_SIZE, CELL_SIZE, CELL_SIZE);
       });
 
-      // Draw the apple specific to this snake.
+      // Draw apple.
       ctx.fillStyle = 'red';
       ctx.fillRect(apple[0] * CELL_SIZE, apple[1] * CELL_SIZE, CELL_SIZE, CELL_SIZE);
 
-      // Draw apple count text (snake length - 1, since initial length is 1).
+      // Draw apple count text.
       const appleCount = snake.length - 1;
       ctx.fillStyle = 'black';
       ctx.font = '20px Arial';
@@ -83,28 +86,6 @@ const DualSnakeGame: React.FC = () => {
     }
   };
 
-  // Set up key listener and polling.
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      let direction = '';
-      if (event.key === 'ArrowUp') direction = 'UP';
-      else if (event.key === 'ArrowDown') direction = 'DOWN';
-      else if (event.key === 'ArrowLeft') direction = 'LEFT';
-      else if (event.key === 'ArrowRight') direction = 'RIGHT';
-      if (direction) {
-        sendDirection(direction);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    const interval = setInterval(fetchGameState, 100);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      clearInterval(interval);
-    };
-  }, []);
-
-  // Redraw canvases on game state update.
   useEffect(() => {
     if (gameState) {
       if (playerCanvasRef.current) {
