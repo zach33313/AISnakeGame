@@ -1,0 +1,60 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: consolas, sans-serif;
+  }
+  
+  .btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 300px;
+    height: 70px;
+    text-decoration: none;
+    color: #39FF14; /* Snake green text */
+    font-size: 24px;
+    text-transform: uppercase;
+    background: transparent;
+    cursor: pointer;
+    overflow: hidden;
+  }
+  
+  .snake-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+  
+  /* Animate the snake path with a more snake-like rounded line.
+     Duration is now 12s (faster than the previous 15s) and it runs forwards. */
+  .snake-path {
+    stroke-linecap: round;
+    animation: drawSnake 6s linear forwards;
+  }
+  
+  @keyframes drawSnake {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  
+  /* Fade out the apple when the snake animation ends.
+     The fade starts at 12s (when the snake reaches it) and runs over 0.5s */
+  .apple {
+    animation: fadeOut 0.1s ease forwards;
+    animation-delay: 5.8s;
+  }
+  
+  @keyframes fadeOut {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
