@@ -12,7 +12,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 GRID_WIDTH = 20
 GRID_HEIGHT = 20
-MOVE_INTERVAL = 0.2  # seconds between moves
+MOVE_INTERVAL = 0  # seconds between moves
 
 def in_bounds(pos):
     x, y = pos
@@ -50,6 +50,7 @@ class Game:
             self.winner = None
             # Initialize cached path for the AI so we don't recalc every move.
             self.ai_path = []
+            self.player_died_by = ""
         else:
             # Initialize player and AI snakes at different starting positions.
             self.player_snake = [(self.grid_width // 2, self.grid_height // 2)]
@@ -236,10 +237,19 @@ class Game:
                                self.ai_snake[0][1] + self.ai_direction[1])
             # Check collisions.
             if not self.player_dead:
-                if (not in_bounds(new_head_player) or
-                    new_head_player in self.player_snake or
-                    new_head_player in self.ai_snake):  # collision with enemy snake
+                did_player_die_to_AI = new_head_player in self.ai_snake
+                did_player_die_to_player = new_head_player in self.player_snake
+                did_player_die_to_wall = not in_bounds(new_head_player)
+                if (did_player_die_to_wall or
+                    did_player_die_to_player or
+                    did_player_die_to_AI):  # collision with enemy snake
                     self.player_dead = True
+                    if did_player_die_to_AI:
+                        self.player_died_by = "AI"
+                    elif did_player_die_to_player:
+                        self.player_died_by = "Player"
+                    else:
+                        self.player_died_by = "Wall" 
             if not self.ai_dead:
                 if (not in_bounds(new_head_ai) or
                     new_head_ai in self.ai_snake or
