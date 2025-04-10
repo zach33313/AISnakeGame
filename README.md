@@ -19,7 +19,7 @@ python3 -m venv path/to/venv
 source path/to/venv/bin/activate
 
 and then install the 4 libraries.
-(pip3 install flask flask-cors flask-socketio evenlet)
+(pip3 install flask flask-cors flask-socketio eventlet)
 
 to run the back-end type python3 app.py. 
 
