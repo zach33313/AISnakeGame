@@ -19,6 +19,7 @@ Backend Set Up:
         venv) zachhixson@Zachs-MacBook-Pro snake-back-end % python3 app.py
         (69182) wsgi starting up on http://123.0.0.1:5000 
     5. Copy the URL(http://123.0.0.1:5000) we need it for later, also your url will possible look different, that is ok! 
+    6. Last thing, if ur getting an error about not being able to find a weird file path text me, its a model but I can't put it on github cuz its too big, I will share it w u via google drive and u can download it and put it in ur backend folder and it will work! Sorry about that.
 
 Frontend Set Up: 
   1. outside of your backend(cd ..) run this npx create-react-app snake-front-end --template typescript
