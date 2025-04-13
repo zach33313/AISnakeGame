@@ -5,15 +5,23 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS, cross_origin
 import threading, time, random, heapq
 from flask_socketio import SocketIO, emit
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import numpy as np
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
+# ------------------ Global Definitions ------------------
 GRID_WIDTH = 20
 GRID_HEIGHT = 20
-MOVE_INTERVAL = 0  # seconds between moves
+MOVE_INTERVAL = 0.2  # seconds between moves
 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# ------------------ Utility Functions ------------------
 def in_bounds(pos):
     x, y = pos
     return 0 <= x < GRID_WIDTH and 0 <= y < GRID_HEIGHT
@@ -25,6 +33,55 @@ def get_neighbors(pos):
 
 def manhattan(a, b):
     return abs(a[0]-b[0]) + abs(a[1]-b[1])
+
+# ------------------ Model Definitions ------------------
+
+class ActorCritic(nn.Module):
+    def __init__(self, grid_width, grid_height, action_size):
+        super(ActorCritic, self).__init__()
+        # Two convolutional layers to capture spatial patterns.
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
+        # Fully-connected layer; convolutional layers preserve dimensions (using padding).
+        self.fc1 = nn.Linear(64 * grid_width * grid_height, 512)
+        # Separate heads for policy and value.
+        self.policy_head = nn.Linear(512, action_size)
+        self.value_head = nn.Linear(512, 1)
+    
+    def forward(self, x):
+        # x is expected to be of shape (batch_size, 1, grid_width, grid_height)
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = x.view(x.size(0), -1)
+        x = F.relu(self.fc1(x))
+        policy_logits = self.policy_head(x)
+        value = self.value_head(x)
+        return policy_logits, value
+
+def get_ai_observation(game):
+    """
+    Build an observation tensor from the current game state.
+    This encoding must match your training setup.
+    - Here we mark the AI snake positions with 1,
+    - the player snake positions with 2,
+    - and the apple with 3.
+    The resulting numpy array is shaped (GRID_WIDTH, GRID_HEIGHT) then converted
+    to a tensor with an extra channel dimension.
+    """
+    grid = np.zeros((game.grid_width, game.grid_height), dtype=np.float32)
+    # Mark the AI snake positions with 1.
+    for cell in game.ai_snake:
+        grid[cell[0], cell[1]] = 1.0
+    # Mark the player snake positions with 2.
+    for cell in game.player_snake:
+        grid[cell[0], cell[1]] = 2.0
+    # Mark the apple with 3.
+    grid[game.apple[0], game.apple[1]] = 3.0
+    # Convert to a tensor and add the channel dimension so final shape is (1, GRID_WIDTH, GRID_HEIGHT)
+    obs_tensor = torch.tensor(grid, dtype=torch.float32).unsqueeze(0)
+    return obs_tensor.to(DEVICE)
+
+# ------------------ Game Backend ------------------
 
 class Game:
     def __init__(self):
@@ -51,6 +108,7 @@ class Game:
             # Initialize cached path for the AI so we don't recalc every move.
             self.ai_path = []
             self.player_died_by = ""
+            self.direction_queue = []
         else:
             # Initialize player and AI snakes at different starting positions.
             self.player_snake = [(self.grid_width // 2, self.grid_height // 2)]
@@ -64,6 +122,7 @@ class Game:
             self.ai_dead = False
             self.game_over = False
             self.winner = None
+            self.direction_queue = []
 
     def _generate_apple(self, *snake_lists):
         while True:
@@ -87,10 +146,49 @@ class Game:
                 break
 
     def change_player_direction(self, new_direction):
-        # Prevent the player from reversing direction directly.
-        if (self.player_direction[0] * -1, self.player_direction[1] * -1) == new_direction:
-            return
-        self.player_direction = new_direction
+        if MOVE_INTERVAL == 0:
+            # In training mode, update immediately.
+            if (self.player_direction[0] * -1, self.player_direction[1] * -1) == new_direction:
+                return
+            self.player_direction = new_direction
+        else:
+            # Enqueue the new direction.
+            self.direction_queue.append(new_direction)
+    def process_direction_queue(self):
+        """
+        Process the queue of direction commands, applying the first valid one.
+        A command is valid if it is not directly opposite to the current direction.
+        """
+        while self.direction_queue:
+            next_direction = self.direction_queue.pop(0)
+            if (self.player_direction[0] * -1, self.player_direction[1] * -1) != next_direction:
+                self.player_direction = next_direction
+                break
+    
+    # ------------------ New AI Direction using PPO Model ------------------
+    def compute_ai_direction_versus_PPO(self):
+        """
+        Instead of using A* logic, we now use the trained PPO model.
+        The observation is built from the current game state.
+        The model returns logits over 4 actions. We choose the action with maximum probability.
+        """
+        # Get the observation tensor (shape: (1, GRID_WIDTH, GRID_HEIGHT))
+        obs = get_ai_observation(self)
+        # Add batch dimension: required shape becomes (1, 1, GRID_WIDTH, GRID_HEIGHT)
+        obs = obs.unsqueeze(0)
+        with torch.no_grad():
+            logits, _ = ppo_model(obs)
+            probs = torch.softmax(logits, dim=1)
+            action_idx = torch.argmax(probs, dim=1).item()
+        # Map the action index to a movement direction.
+        mapping = {
+            0: (0, -1),  # Up
+            1: (0, 1),   # Down
+            2: (-1, 0),  # Left
+            3: (1, 0)    # Right
+        }
+        return mapping[action_idx]
+
 
     def compute_ai_direction(self):
         # Standard A* search for classic mode (unchanged)
@@ -221,7 +319,10 @@ class Game:
     def move(self):
         if self.game_over:
             return
-
+        
+        if MOVE_INTERVAL > 0:
+            self.process_direction_queue()
+        
         if self.mode == "versus":
             # In versus mode, update the AI direction using the versus function.
             if not self.ai_dead:
@@ -324,8 +425,19 @@ class Game:
                     self.game_over = True
                     self.winner = "AI"
                     return
+# ------------------ End of Game Class ------------------
 
 game = Game()
+
+# ------------------ Load Trained PPO Model ------------------
+
+# Define and load the model if the mode is set for versus.
+ppo_model = ActorCritic(GRID_WIDTH, GRID_HEIGHT, 4).to(DEVICE)
+ppo_model.load_state_dict(torch.load("ppo_snake_100000.pth", map_location=DEVICE))
+ppo_model.eval()
+print("Loaded PPO model from ppo_snake_100000.pth")
+
+# ------------------ Web Socket and Game Loop ------------------
 
 def game_loop():
     while True:
