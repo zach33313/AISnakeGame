@@ -284,14 +284,17 @@ def train_ppo_classic(board_size, total_episodes):
             print(f"New best replay at episode {episode_num} with reward {ep_reward:.2f}")
 
         # mark special points
-        is_special = (episode_num % 20000 == 0 or running_reward > global_max_running_avg*1.1)
+        is_special = (ep_reward > running_reward*1.1)
         if is_special:
             special_points.append(episode_num)
-            global_max_running_avg = running_reward
             checkpoint_filename = f"{episode_num}_{board_size}{MODEL_FILENAME}"
             torch.save(agent.policy.state_dict(), checkpoint_filename)
             print(f"Saved checkpoint to {checkpoint_filename}")
-
+        elif episode_num > 50_000 and episode_num % 10_000 == 0:
+            special_points.append(episode_num)
+            checkpoint_filename = f"{episode_num}_{board_size}{MODEL_FILENAME}"
+            torch.save(agent.policy.state_dict(), checkpoint_filename)
+            print(f"Saved checkpoint to {checkpoint_filename}")
 
     checkpoint_filename = f"{episode_num}_{board_size}{MODEL_FILENAME}"
     torch.save(agent.policy.state_dict(), checkpoint_filename)
@@ -452,4 +455,4 @@ def stop_evaluate():
 
 if __name__ == '__main__':
     # Run the training Flask app on port 5001.
-    app_train.run(port=5001, debug=True)
+    app_train.run(host="0.0.0.0", port=5001, debug=True)
