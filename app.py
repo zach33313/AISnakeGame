@@ -59,27 +59,32 @@ class ActorCritic(nn.Module):
         return policy_logits, value
 
 def get_ai_observation(game):
-    """
-    Build an observation tensor from the current game state.
-    This encoding must match your training setup.
-    - Here we mark the AI snake positions with 1,
-    - the player snake positions with 2,
-    - and the apple with 3.
-    The resulting numpy array is shaped (GRID_WIDTH, GRID_HEIGHT) then converted
-    to a tensor with an extra channel dimension.
-    """
-    grid = np.zeros((game.grid_width, game.grid_height), dtype=np.float32)
-    # Mark the AI snake positions with 1.
+    # Build a single-channel grid: 1=AI snake, 2=player snake, 3=apple
+    w, h = game.grid_width, game.grid_height
+    grid = np.zeros((w, h), dtype=np.float32)
     for cell in game.ai_snake:
         grid[cell[0], cell[1]] = 1.0
-    # Mark the player snake positions with 2.
     for cell in game.player_snake:
         grid[cell[0], cell[1]] = 2.0
-    # Mark the apple with 3.
-    grid[game.apple[0], game.apple[1]] = 3.0
-    # Convert to a tensor and add the channel dimension so final shape is (1, GRID_WIDTH, GRID_HEIGHT)
-    obs_tensor = torch.tensor(grid, dtype=torch.float32).unsqueeze(0)
-    return obs_tensor.to(DEVICE)
+    # pick the right apple for classic vs versus
+    apple = getattr(game, 'ai_apple', getattr(game, 'apple', None))
+    if apple:
+        grid[apple[0], apple[1]] = 3.0
+    tensor = torch.tensor(grid, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+    return tensor.to(DEVICE)
+
+# Load all three PPO models into a dict keyed by board size
+ppo_models = {}
+for size, fname in [(6, "1000000_6_classic_model.pth"),
+                    (10, "2000000_10_classic_model.pth")]:
+                    #(20, "ppo_snake_100000.pth")]
+    m = ActorCritic(size, size, 4).to(DEVICE)
+    m.load_state_dict(torch.load(fname, map_location=DEVICE))
+    m.eval()
+    ppo_models[size] = m
+print("Loaded PPO models for sizes:", list(ppo_models.keys()))
+
+
 
 # ------------------ Game Backend ------------------
 
@@ -88,9 +93,16 @@ class Game:
         self.grid_width = GRID_WIDTH
         self.grid_height = GRID_HEIGHT
         self.mode = "classic"
+        self.ai_model = "A_STAR"
+        self.mode = "classic"
         self.reset()
 
-    def reset(self, mode="classic"):
+    def reset(self, mode="classic", board_size=None, ai_model="A_STAR"):
+        if board_size:
+            global GRID_WIDTH, GRID_HEIGHT
+            GRID_WIDTH = GRID_HEIGHT = board_size
+            self.grid_width = self.grid_height = board_size
+        self.ai_model = ai_model  # "A_STAR" or "PPO"
         self.mode = mode
         if mode == "versus":
             # In versus mode both snakes share one apple.
@@ -166,31 +178,21 @@ class Game:
                 break
     
     # ------------------ New AI Direction using PPO Model ------------------
-    def compute_ai_direction_versus_PPO(self):
-        """
-        Instead of using A* logic, we now use the trained PPO model.
-        The observation is built from the current game state.
-        The model returns logits over 4 actions. We choose the action with maximum probability.
-        """
-        # Get the observation tensor (shape: (1, GRID_WIDTH, GRID_HEIGHT))
+    def compute_ai_direction_PPO(self):
+        model = ppo_models.get(self.grid_width, ppo_models[self.grid_height])
         obs = get_ai_observation(self)
-        # Add batch dimension: required shape becomes (1, 1, GRID_WIDTH, GRID_HEIGHT)
-        obs = obs.unsqueeze(0)
+        print("PPO obs shape:", obs.shape)
         with torch.no_grad():
-            logits, _ = ppo_model(obs)
-            probs = torch.softmax(logits, dim=1)
-            action_idx = torch.argmax(probs, dim=1).item()
-        # Map the action index to a movement direction.
-        mapping = {
-            0: (0, -1),  # Up
-            1: (0, 1),   # Down
-            2: (-1, 0),  # Left
-            3: (1, 0)    # Right
-        }
-        return mapping[action_idx]
+            logits, _ = model(obs)
+            probs = F.softmax(logits, dim=1)
+            print("PPO probs:", probs.cpu().numpy())
+            action = torch.argmax(probs, dim=1).item()
+            print("PPO action:", action)
+        return {0:(0,-1), 1:(0,1), 2:(-1,0), 3:(1,0)}[action]
 
 
-    def compute_ai_direction(self):
+
+    def compute_ai_direction_astar(self):
         # Standard A* search for classic mode (unchanged)
         if self.mode == "classic":
             start = self.ai_snake[0]
@@ -237,6 +239,20 @@ class Game:
         else:
             # This branch should not be reached in compute_ai_direction since versus mode is handled in compute_ai_direction_versus.
             return self.ai_direction
+        
+    def compute_ai_direction(self):
+        if self.mode == "classic":
+            if self.ai_model == "PPO":
+                return self.compute_ai_direction_PPO()
+            else:
+                return self.compute_ai_direction_astar()
+        else:
+            # versus-mode already has two methods
+            if self.ai_model == "PPO":
+                return self.compute_ai_direction_versus_PPO()
+            else:
+                return self.compute_ai_direction_versus()
+
 
     def compute_ai_direction_versus(self):
         # Optimization: Reuse a cached path if it exists and is still valid.
@@ -326,7 +342,7 @@ class Game:
         if self.mode == "versus":
             # In versus mode, update the AI direction using the versus function.
             if not self.ai_dead:
-                self.ai_direction = self.compute_ai_direction_versus()
+                self.ai_direction = self.compute_ai_direction()
             # Compute new head positions only for alive snakes.
             new_head_player = None
             if not self.player_dead:
@@ -519,15 +535,18 @@ def on_change_direction(data):
 
 @socketio.on('new_game')
 def on_new_game(data):
-    mode = data.get("mode", "classic")
-    print("Starting new game in mode:", mode)
-    game.reset(mode)
+    mode       = data.get("mode", "classic")
+    board_size = int(data.get("board_size", 20))
+    ai_model   = data.get("ai_model", "A_STAR")  # or "PPO"
+    print(f"Starting new game: mode={mode}, size={board_size}, ai={ai_model}")
+    game.reset(mode, board_size, ai_model)
     emit('new_game_ack', {'status': 'ok'})
+
 
 @socketio.on('restart_game')
 def on_restart_game():
     print("game restarted with:" + game.mode)
-    game.reset(game.mode)
+    game.reset(game.mode, game.grid_height, game.ai_model)
     emit('restart_game_ack', {'status': 'ok'})
 
 if __name__ == '__main__':
