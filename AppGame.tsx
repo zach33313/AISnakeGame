@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import VersusSnakeGame from './VersusSnakeGame';
 import DualSnakeGame from './SnakeGame'; // Classic mode component.
-import RestartButton from './Restart';
+import RestartButton from './restart';
 import { socket } from './socket';  // Import our shared socket connection.
 import './AppGame.css';
 
@@ -15,20 +15,32 @@ const AppGame: React.FC = () => {
   const [newGameFlag, setNewGameFlag] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-  const [gameKey, setGameKey] = useState(Date.now());
+  const [isWaiting, setIsWaiting] = useState(true);
 
   // defaults
   const [selectedSize, setSelectedSize] = useState<number>(20);
   const [selectedOpponent, setSelectedOpponent] = useState<'A_STAR' | 'PPO'>('A_STAR');
 
+  useEffect(() => {
+    // Listen for game started event
+    socket.on('game_started', () => {
+      setIsWaiting(false);
+    });
+
+    return () => {
+      socket.off('game_started');
+    };
+  }, []);
+
   const handleRestart = () => {
-    setGameKey(Date.now());
+    setIsWaiting(true);
     console.log('Game restarted!');
   };
 
   // Generic new-game emitter
   const startNewGame = async (newMode: 'classic' | 'versus', newModel: 'A_STAR' | 'PPO', newSize: number) => {
     setIsLoading(true);
+    setIsWaiting(true);
     try {
       console.log('Starting new game:', { newMode, selectedSize, selectedOpponent });
       socket.emit('new_game', {
@@ -127,11 +139,22 @@ const AppGame: React.FC = () => {
 
         <div className="game-container">
           {isLoading && <div className="loader" />}
-          {!isLoading && mode === 'versus' && (
-            <VersusSnakeGame key={newGameFlag} />
-          )}
-          {!isLoading && mode === 'classic' && (
-            <DualSnakeGame key={newGameFlag} />
+          {!isLoading && (
+            <>
+              {isWaiting && (
+                <div className="waiting-overlay">
+                  <div className="waiting-message">
+                    Press any arrow key to start
+                  </div>
+                </div>
+              )}
+              {mode === 'versus' && (
+                <VersusSnakeGame key={newGameFlag} />
+              )}
+              {mode === 'classic' && (
+                <DualSnakeGame key={newGameFlag} />
+              )}
+            </>
           )}
         </div>
 
@@ -143,4 +166,4 @@ const AppGame: React.FC = () => {
   );
 };
 
-export default AppGame;
+export default AppGame; 
