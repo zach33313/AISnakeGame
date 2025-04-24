@@ -91,7 +91,7 @@ def get_ai_state(game):
 ppo_models = {}
 for size, fname in [(6, "60500_6_classic_model.pth"), 
                     (10, "21895_10_classic_modelFF.pth"),
-                    (20,"21895_10_classic_modelFF.pth")
+                    (20,"8500_20_classic_modelFF.pth")
                     ]:
     model = ActorCriticFF(state_size=11, action_size=3).to(DEVICE)
     model.load_state_dict(torch.load(fname, map_location=DEVICE))
@@ -110,6 +110,7 @@ class Game:
         self.mode = "classic"
         self.ai_model = "A_STAR"
         self.mode = "classic"
+        self.waiting = True
         self.reset()
 
     def reset(self, mode="classic", board_size=None, ai_model="A_STAR"):
@@ -119,6 +120,7 @@ class Game:
             self.grid_width = self.grid_height = board_size
         self.ai_model = ai_model  # "A_STAR" or "PPO"
         self.mode = mode
+        self.waiting = True
         if mode == "versus":
             # In versus mode both snakes share one apple.
             self.player_snake = [(self.grid_width // 2, self.grid_height // 2)]
@@ -354,7 +356,7 @@ class Game:
         return self.ai_direction
 
     def move(self):
-        if self.game_over:
+        if self.game_over or self.waiting:
             return
         
         if MOVE_INTERVAL > 0:
@@ -551,6 +553,7 @@ def on_change_direction(data):
         'RIGHT': (1, 0),
     }
     if direction in mapping:
+        game.waiting = False
         game.change_player_direction(mapping[direction])
     emit('change_direction_ack', {'status': 'ok'})
 
