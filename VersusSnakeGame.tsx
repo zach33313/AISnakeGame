@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { socket } from './socket';
-
+import appleImg from './apple-removebg-preview.png';
 
 
 type VersusGameState = {
@@ -19,6 +19,9 @@ const CELL_SIZE = 20;      // Each grid cell is 20x20 pixels
 const EXTRA_HEIGHT = 40;   // Extra space at bottom for snake length text
 const ip_and_port = 'http://127.0.0.1:5000/';
 const socketServerUrl = 'http://127.0.0.1:5000/';
+// apple image import
+const appleImage = new Image();
+appleImage.src = appleImg;
 
 
 const VersusSnakeGame: React.FC = () => {
@@ -39,17 +42,17 @@ const VersusSnakeGame: React.FC = () => {
       socket.off('game_state');
     };
   }, []);
-/*
-  const fetchGameState = async () => {
-    try {
-      const response = await fetch(ip_and_port + 'state');
-      const state: VersusGameState = await response.json();
-      setGameState(state);
-    } catch (error) {
-      console.error('Error fetching game state:', error);
-    }
-  };
-*/
+  /*
+    const fetchGameState = async () => {
+      try {
+        const response = await fetch(ip_and_port + 'state');
+        const state: VersusGameState = await response.json();
+        setGameState(state);
+      } catch (error) {
+        console.error('Error fetching game state:', error);
+      }
+    };
+  */
   /*const sendDirection = async (direction: string) => {
     try {
       await fetch(ip_and_port + 'change_direction', {
@@ -68,59 +71,101 @@ const VersusSnakeGame: React.FC = () => {
 
   const drawCanvas = (canvas: HTMLCanvasElement, gameState: VersusGameState) => {
     const ctx = canvas.getContext('2d');
-    if (ctx) {
-      const width = gameState.grid_width * CELL_SIZE;
-      const height = gameState.grid_height * CELL_SIZE;
-      // Set canvas size: extra height for text at bottom.
-      canvas.width = width;
-      canvas.height = height + EXTRA_HEIGHT;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!ctx) return;
 
-      // Draw grid outline.
-      ctx.strokeStyle = 'black';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(0, 0, width, height);
+    const drawEyes = (x: number, y: number, outlineColor: string) => {
+      const centerX = x * CELL_SIZE + CELL_SIZE / 2;
+      const centerY = y * CELL_SIZE + CELL_SIZE / 2;
+      const eyeOffset = 7;
+      const eyeRadius = 6;
 
-      // Draw player snake (green).
-      ctx.fillStyle = 'green';
-      gameState.player_snake.forEach(cell => {
-        ctx.fillRect(cell[0] * CELL_SIZE, cell[1] * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-      });
+      ctx.fillStyle = 'white';
+      ctx.strokeStyle = outlineColor;
+      ctx.lineWidth = 1;
 
-      // Draw AI snake (blue).
-      ctx.fillStyle = 'blue';
-      gameState.ai_snake.forEach(cell => {
-        ctx.fillRect(cell[0] * CELL_SIZE, cell[1] * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-      });
+      // left eye
+      ctx.beginPath();
+      ctx.arc(centerX - eyeOffset, centerY - eyeOffset, eyeRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
 
-      // Draw the shared apple (red).
-      ctx.fillStyle = 'red';
-      ctx.fillRect(
-        gameState.apple[0] * CELL_SIZE,
-        gameState.apple[1] * CELL_SIZE,
-        CELL_SIZE,
-        CELL_SIZE
-      );
+      // right eye
+      ctx.beginPath();
+      ctx.arc(centerX + eyeOffset, centerY - eyeOffset, eyeRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
 
-      // Draw the snake lengths.
-      const playerLength = gameState.player_snake.length;
-      const aiLength = gameState.ai_snake.length;
       ctx.fillStyle = 'black';
-      ctx.font = '20px Arial';
-      ctx.textAlign = 'center';
-      // We display two lines of text at the bottom.
-      ctx.fillText(
-        `Player Length: ${playerLength} (${playerLength - 1} apples)`,
-        width / 2,
-        height + EXTRA_HEIGHT - 20
-      );
-      ctx.fillText(
-        `AI Length: ${aiLength} (${aiLength - 1} apples)`,
-        width / 2,
-        height + EXTRA_HEIGHT - 0
+      ctx.beginPath();
+      ctx.arc(centerX - eyeOffset, centerY - eyeOffset, 2, 0, Math.PI * 2);
+      ctx.arc(centerX + eyeOffset, centerY - eyeOffset, 2, 0, Math.PI * 2);
+      ctx.fill();
+    };
+
+
+    const width = gameState.grid_width * CELL_SIZE;
+    const height = gameState.grid_height * CELL_SIZE;
+    canvas.width = width;
+    canvas.height = height + EXTRA_HEIGHT;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Grid border
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(0, 0, width, height);
+
+    const drawSnake = (
+      snake: [number, number][],
+      color: string,
+      headColor: string
+    ) => {
+      snake.forEach(([x, y], index) => {
+        const px = x * CELL_SIZE;
+        const py = y * CELL_SIZE;
+        ctx.fillStyle = index === 0 ? headColor : color;
+        ctx.beginPath();
+        ctx.roundRect(px, py, CELL_SIZE, CELL_SIZE, 6);
+        ctx.fill();
+      });
+    };
+
+    // Draw snakes diff colors for player and ai
+    drawSnake(gameState.player_snake, '#77dd77', '#32a852'); // Green snake for player
+    drawSnake(gameState.ai_snake, '#89CFF0', '#1f75fe');      // Blue snake for ai
+
+    // draw eyes (w/ diff colored outlines)
+    const [px, py] = gameState.player_snake[0];
+    const [aiX, aiY] = gameState.ai_snake[0];
+    drawEyes(px, py, '#1c5c32');
+    drawEyes(aiX, aiY, '#1a4ba0');
+
+
+
+    // apple image rendering
+    const [ax, ay] = gameState.apple;
+    const imgSize = CELL_SIZE;
+
+    // fixes issue of apple flickering: only render if apple doesnt alr exist
+    if (appleImage.complete) {
+      ctx.drawImage(
+        appleImage,
+        ax * CELL_SIZE,
+        ay * CELL_SIZE,
+        imgSize,
+        imgSize
       );
     }
+
+    // Text stats
+    ctx.fillStyle = 'black';
+    ctx.font = '20px Arial';
+    ctx.textAlign = 'center';
+    const playerLength = gameState.player_snake.length;
+    const aiLength = gameState.ai_snake.length;
+    ctx.fillText(`Player Length: ${playerLength} (${playerLength - 1} apples)`, width / 2, height + EXTRA_HEIGHT - 20);
+    ctx.fillText(`AI Length: ${aiLength} (${aiLength - 1} apples)`, width / 2, height + EXTRA_HEIGHT - 0);
   };
+
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
