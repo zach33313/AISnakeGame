@@ -1,4 +1,3 @@
-// DualSnakeGame.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import { socket } from './socket';
 import appleImg from './apple-removebg-preview.png';
@@ -14,7 +13,9 @@ type GameState = {
   grid_height: number,
 };
 
-const CELL_SIZE = 20;      // Each grid cell is 20x20 pixels.
+// Fixed canvas dimensions
+const CANVAS_WIDTH = 400;  // Fixed width in pixels 
+const CANVAS_HEIGHT = 400; // Fixed height in pixels
 const EXTRA_HEIGHT = 30;   // Extra space at bottom for text.
 // apple image import
 const appleImage = new Image();
@@ -31,11 +32,17 @@ export const drawCanvas = (
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
+  // Calculate cell size dynamically based on grid dimensions
+  const CELL_SIZE = Math.min(
+    CANVAS_WIDTH / grid_width,
+    CANVAS_HEIGHT / grid_height
+  );
+
   const drawEyes = (x: number, y: number, outlineColor: string) => {
     const centerX = x * CELL_SIZE + CELL_SIZE / 2;
     const centerY = y * CELL_SIZE + CELL_SIZE / 2;
-    const eyeOffset = 7;
-    const eyeRadius = 6;
+    const eyeOffset = CELL_SIZE * 0.35; // Scale eye position with cell size
+    const eyeRadius = CELL_SIZE * 0.3;  // Scale eye size with cell size
 
     ctx.fillStyle = 'white';
     ctx.strokeStyle = outlineColor;
@@ -55,21 +62,28 @@ export const drawCanvas = (
 
     ctx.fillStyle = 'black';
     ctx.beginPath();
-    ctx.arc(centerX - eyeOffset, centerY - eyeOffset, 2, 0, Math.PI * 2);
-    ctx.arc(centerX + eyeOffset, centerY - eyeOffset, 2, 0, Math.PI * 2);
+    ctx.arc(centerX - eyeOffset, centerY - eyeOffset, CELL_SIZE * 0.1, 0, Math.PI * 2);
+    ctx.arc(centerX + eyeOffset, centerY - eyeOffset, CELL_SIZE * 0.1, 0, Math.PI * 2);
     ctx.fill();
   };
 
-  const width = grid_width * CELL_SIZE;
-  const height = grid_height * CELL_SIZE;
-  canvas.width = width;
-  canvas.height = height + EXTRA_HEIGHT;
+  // Set canvas to fixed dimensions
+  canvas.width = CANVAS_WIDTH;
+  canvas.height = CANVAS_HEIGHT + EXTRA_HEIGHT;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw checkerboard pattern for background
+  for (let row = 0; row < grid_height; row++) {
+    for (let col = 0; col < grid_width; col++) {
+      ctx.fillStyle = (row + col) % 2 === 0 ? '#ffffff' : '#e5e5e5';
+      ctx.fillRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+    }
+  }
 
   // border
   ctx.strokeStyle = 'black';
   ctx.lineWidth = 2;
-  ctx.strokeRect(0, 0, width, height);
+  ctx.strokeRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
   const drawSnake = (
     snake: [number, number][],
@@ -81,7 +95,7 @@ export const drawCanvas = (
       const py = y * CELL_SIZE;
       ctx.fillStyle = index === 0 ? headColor : color;
       ctx.beginPath();
-      ctx.roundRect(px, py, CELL_SIZE, CELL_SIZE, 6);
+      ctx.roundRect(px, py, CELL_SIZE, CELL_SIZE, CELL_SIZE * 0.3);
       ctx.fill();
     });
   };
@@ -109,7 +123,7 @@ export const drawCanvas = (
   ctx.fillStyle = 'black';
   ctx.font = '20px Arial';
   ctx.textAlign = 'center';
-  ctx.fillText(`${label} Length: ${snake.length} (${snake.length - 1} apples)`, width / 2, height + 20);
+  ctx.fillText(`${label} Length: ${snake.length} (${snake.length - 1} apples)`, CANVAS_WIDTH / 2, CANVAS_HEIGHT + 20);
 };
 
 const DualSnakeGame: React.FC = () => {
@@ -188,4 +202,4 @@ const DualSnakeGame: React.FC = () => {
   );
 };
 
-export default DualSnakeGame;
+export default DualSnakeGame; 
