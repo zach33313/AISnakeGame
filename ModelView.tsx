@@ -34,7 +34,7 @@ interface BestReplay {
 
 // ------------- Config -------------
 const trainingServers: TrainingServer[] = [
-  { id: 'Server 1', url: 'http://10.0.0.88:5001' }
+  { id: 'Server 1', url: 'ur_ip_and_port_here' }
 ];
 const POLL_INTERVAL_MS = 10000     // 10s for training status
 const EVAL_STEP_INTERVAL = 200     // ms between eval frames
