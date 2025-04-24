@@ -1,5 +1,9 @@
 .App {
   text-align: center;
+  display: flex;
+  flex-direction: row;
+  height: 100vh;
+  background-color: #606c38;
 }
 
 .App-logo {
@@ -32,6 +36,7 @@
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -47,7 +52,12 @@
   border-color: #000 #0000;
   animation: l1 1s infinite;
 }
-@keyframes l1 {to{transform: rotate(.5turn)}}
+
+@keyframes l1 {
+  to {
+    transform: rotate(.5turn)
+  }
+}
 
 /* Container for snake head and tongue */
 .dropdown {
@@ -60,11 +70,13 @@
 /* Enlarged snake head */
 .snake-head {
   position: relative;
-  width: 180px; /* Adjust if needed */
+  width: 180px;
+  /* Adjust if needed */
   height: auto;
   display: block;
   transition: transform 0.3s;
 }
+
 .snake-head:hover {
   transform: scale(1.05);
 }
@@ -78,13 +90,15 @@
   transform-origin: top center;
   transition: transform 0.4s ease-in-out;
 }
+
 .tongue-container.show {
   transform: translate(-50%, -20%) scaleY(1);
 }
 
 /* Enlarged snake tongue */
 .snake-tongue {
-  width: 160px; /* Adjust if needed */
+  width: 190px;
+  /* Adjust if needed */
   height: auto;
   display: block;
 }
@@ -92,11 +106,13 @@
 /* Stack the apple buttons vertically */
 .tongue-options {
   position: absolute;
-  top: 65%;  /* Adjust to position the options on the tongue */
+  top: 65%;
+  /* Adjust to position the options on the tongue */
   left: 50%;
   transform: translate(-50%, -50%);
   display: flex;
-  flex-direction: column; /* Stack vertically */
+  flex-direction: column;
+  /* Stack vertically */
   align-items: center;
 }
 
@@ -108,7 +124,8 @@
   padding: 0;
   margin: 0;
   cursor: pointer;
-  width: 60px;   /* Adjust apple size if needed */
+  width: 60px;
+  /* Adjust apple size if needed */
   height: 60px;
   display: flex;
   align-items: center;
@@ -127,7 +144,8 @@
   top: 55%;
   left: 50%;
   transform: translate(-50%, -50%);
-  color: #000000; /* Snake green text */
+  color: greenyellow;
+  /* Snake green text */
   font-size: 12px;
   pointer-events: none;
 }
@@ -136,4 +154,43 @@
 .apple-button:hover img {
   transform: scale(1.05);
   transition: transform 0.2s;
+}
+
+.sidebar {
+  width: 250px;
+  background-color: #283618;
+  color: white;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.settings label {
+  display: block;
+  margin: 10px;
+}
+
+.game-container {
+  margin: 20px;
+  display: flex;
+  height: 60%;
+  justify-content: center;
+  align-items: center;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+
+.restart {
+  margin-top: 20px;
+}
+
+.credits {
+  padding-top: 50%;
+  font-size: small;
 }

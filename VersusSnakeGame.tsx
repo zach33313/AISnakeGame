@@ -16,7 +16,7 @@ type VersusGameState = {
 };
 
 const CELL_SIZE = 20;      // Each grid cell is 20x20 pixels
-const EXTRA_HEIGHT = 40;   // Extra space at bottom for snake length text
+const EXTRA_HEIGHT = 50;   // Extra space at bottom for snake length text
 const ip_and_port = 'http://127.0.0.1:5000/';
 const socketServerUrl = 'http://127.0.0.1:5000/';
 // apple image import
@@ -42,29 +42,7 @@ const VersusSnakeGame: React.FC = () => {
       socket.off('game_state');
     };
   }, []);
-  /*
-    const fetchGameState = async () => {
-      try {
-        const response = await fetch(ip_and_port + 'state');
-        const state: VersusGameState = await response.json();
-        setGameState(state);
-      } catch (error) {
-        console.error('Error fetching game state:', error);
-      }
-    };
-  */
-  /*const sendDirection = async (direction: string) => {
-    try {
-      await fetch(ip_and_port + 'change_direction', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ direction }),
-      });
-    } catch (error) {
-      console.error('Error sending direction:', error);
-    }
-  };
-*/
+
   const sendDirection = (direction: string) => {
     socket?.emit('change_direction', { direction });
   };
@@ -108,6 +86,14 @@ const VersusSnakeGame: React.FC = () => {
     canvas.width = width;
     canvas.height = height + EXTRA_HEIGHT;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // checkerboard background
+    for (let row = 0; row < gameState.grid_height; row++) {
+      for (let col = 0; col < gameState.grid_width; col++) {
+        ctx.fillStyle = (row + col) % 2 === 0 ? '#ffffff' : '#e5e5e5';
+        ctx.fillRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+      }
+    }
 
     // Grid border
     ctx.strokeStyle = 'black';
@@ -156,14 +142,14 @@ const VersusSnakeGame: React.FC = () => {
       );
     }
 
-    // Text stats
+    // Text stats (score)
     ctx.fillStyle = 'black';
-    ctx.font = '20px Arial';
+    ctx.font = '16px Arial';
     ctx.textAlign = 'center';
     const playerLength = gameState.player_snake.length;
     const aiLength = gameState.ai_snake.length;
-    ctx.fillText(`Player Length: ${playerLength} (${playerLength - 1} apples)`, width / 2, height + EXTRA_HEIGHT - 20);
-    ctx.fillText(`AI Length: ${aiLength} (${aiLength - 1} apples)`, width / 2, height + EXTRA_HEIGHT - 0);
+    ctx.fillText(`Player Length: ${playerLength} (${playerLength - 1} apples)`, width / 2, height + 20);
+    ctx.fillText(`AI Length: ${aiLength} (${aiLength - 1} apples)`, width / 2, height + 40);
   };
 
 
@@ -198,10 +184,10 @@ const VersusSnakeGame: React.FC = () => {
             top: '10px',
             width: '100%',
             textAlign: 'center',
-            backgroundColor: 'rgba(255,255,255,0.8)',
+            backgroundColor: 'rgba(255,255,255,0.8)'
           }}
         >
-          <h2>Game Over! Winner: {gameState.winner}</h2>
+          <h2>Game Over! 🎉 Winner: {gameState.winner}</h2>
         </div>
       )}
     </div>
