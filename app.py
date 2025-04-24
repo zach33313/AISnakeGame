@@ -36,53 +36,68 @@ def manhattan(a, b):
 
 # ------------------ Model Definitions ------------------
 
-class ActorCritic(nn.Module):
-    def __init__(self, grid_width, grid_height, action_size):
-        super(ActorCritic, self).__init__()
-        # Two convolutional layers to capture spatial patterns.
-        self.conv1 = nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, stride=1, padding=1)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
-        # Fully-connected layer; convolutional layers preserve dimensions (using padding).
-        self.fc1 = nn.Linear(64 * grid_width * grid_height, 512)
-        # Separate heads for policy and value.
-        self.policy_head = nn.Linear(512, action_size)
-        self.value_head = nn.Linear(512, 1)
-    
-    def forward(self, x):
-        # x is expected to be of shape (batch_size, 1, grid_width, grid_height)
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = x.view(x.size(0), -1)
-        x = F.relu(self.fc1(x))
-        policy_logits = self.policy_head(x)
-        value = self.value_head(x)
-        return policy_logits, value
+class ActorCriticFF(nn.Module):
+    def __init__(self, state_size, action_size, hidden_size=256):
+        super(ActorCriticFF, self).__init__()
+        self.shared_layers = nn.Sequential(
+            nn.Linear(state_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.ReLU()
+        )
+        self.policy_head = nn.Linear(hidden_size, action_size)
+        self.value_head  = nn.Linear(hidden_size, 1)
 
-def get_ai_observation(game):
-    # Build a single-channel grid: 1=AI snake, 2=player snake, 3=apple
-    w, h = game.grid_width, game.grid_height
-    grid = np.zeros((w, h), dtype=np.float32)
-    for cell in game.ai_snake:
-        grid[cell[0], cell[1]] = 1.0
-    for cell in game.player_snake:
-        grid[cell[0], cell[1]] = 2.0
-    # pick the right apple for classic vs versus
+    def forward(self, x):
+        if not isinstance(x, torch.Tensor):
+            x = torch.FloatTensor(x).to(next(self.parameters()).device)
+        if x.dim() == 1:
+            x = x.unsqueeze(0)
+        x = self.shared_layers(x)
+        return self.policy_head(x), self.value_head(x)
+
+def get_ai_state(game):
+    head = game.ai_snake[0]
+    dx, dy = game.ai_direction
+    # Danger straight, right, left
+    def is_collision(pt):
+        return (pt[0] < 0 or pt[0] >= game.grid_width or pt[1] < 0 or pt[1] >= game.grid_height
+                or (pt in game.ai_snake and pt != game.ai_snake[-1]))
+    straight = (head[0]+dx, head[1]+dy)
+    right    = (head[0]-dy, head[1]+dx)
+    left     = (head[0]+dy, head[1]-dx)
+    danger_straight = is_collision(straight)
+    danger_right    = is_collision(right)
+    danger_left     = is_collision(left)
+    # Direction one-hot
+    dir_west  = dx == -1
+    dir_east  = dx == 1
+    dir_north = dy == -1
+    dir_south = dy == 1
+    # Food direction
     apple = getattr(game, 'ai_apple', getattr(game, 'apple', None))
-    if apple:
-        grid[apple[0], apple[1]] = 3.0
-    tensor = torch.tensor(grid, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
-    return tensor.to(DEVICE)
+    food_west  = apple[0] < head[0]
+    food_east  = apple[0] > head[0]
+    food_north = apple[1] < head[1]
+    food_south = apple[1] > head[1]
+    state = [
+        danger_straight, danger_right, danger_left,
+        dir_west, dir_east, dir_north, dir_south,
+        food_west, food_east, food_north, food_south
+    ]
+    return np.array(state, dtype=np.float32)
 
 # Load all three PPO models into a dict keyed by board size
 ppo_models = {}
-for size, fname in [(6, "1000000_6_classic_model.pth"),
-                    (10, "2000000_10_classic_model.pth")]:
-                    #(20, "ppo_snake_100000.pth")]
-    m = ActorCritic(size, size, 4).to(DEVICE)
-    m.load_state_dict(torch.load(fname, map_location=DEVICE))
-    m.eval()
-    ppo_models[size] = m
-print("Loaded PPO models for sizes:", list(ppo_models.keys()))
+for size, fname in [(6, "60500_6_classic_model.pth"), 
+                    (10, "21895_10_classic_modelFF.pth"),
+                    (20,"21895_10_classic_modelFF.pth")
+                    ]:
+    model = ActorCriticFF(state_size=11, action_size=3).to(DEVICE)
+    model.load_state_dict(torch.load(fname, map_location=DEVICE))
+    model.eval()
+    ppo_models[size] = model
+print("Loaded FF PPO models for sizes:", list(ppo_models.keys()))
 
 
 
@@ -179,16 +194,22 @@ class Game:
     
     # ------------------ New AI Direction using PPO Model ------------------
     def compute_ai_direction_PPO(self):
-        model = ppo_models.get(self.grid_width, ppo_models[self.grid_height])
-        obs = get_ai_observation(self)
-        print("PPO obs shape:", obs.shape)
+        # Use FF model
+        model = ppo_models.get(self.grid_width)
+        state = get_ai_state(self)
         with torch.no_grad():
-            logits, _ = model(obs)
-            probs = F.softmax(logits, dim=1)
-            print("PPO probs:", probs.cpu().numpy())
-            action = torch.argmax(probs, dim=1).item()
-            print("PPO action:", action)
-        return {0:(0,-1), 1:(0,1), 2:(-1,0), 3:(1,0)}[action]
+            logits, _ = model(state)
+            action = torch.argmax(F.softmax(logits, dim=1), dim=1).item()
+        # Map 0=straight,1=right,2=left relative to self.ai_direction
+        dx, dy = self.ai_direction
+        if action == 0:
+            new_dir = (dx, dy)
+        elif action == 1:
+            new_dir = (-dy, dx)
+        else:
+            new_dir = (dy, -dx)
+        self.ai_direction = new_dir
+        return new_dir
 
 
 
@@ -448,10 +469,10 @@ game = Game()
 # ------------------ Load Trained PPO Model ------------------
 
 # Define and load the model if the mode is set for versus.
-ppo_model = ActorCritic(GRID_WIDTH, GRID_HEIGHT, 4).to(DEVICE)
-ppo_model.load_state_dict(torch.load("ppo_snake_100000.pth", map_location=DEVICE))
-ppo_model.eval()
-print("Loaded PPO model from ppo_snake_100000.pth")
+#ppo_model = ActorCriticFF(GRID_WIDTH, GRID_HEIGHT, 4).to(DEVICE)
+#ppo_model.load_state_dict(torch.load("ppo_snake_100000.pth", map_location=DEVICE))
+#ppo_model.eval()
+#print("Loaded PPO model from ppo_snake_100000.pth")
 
 # ------------------ Web Socket and Game Loop ------------------
 
