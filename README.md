@@ -4,7 +4,7 @@ Overview:
   This repo has files of 3 types, Frontend(any .tsx or .css or image files), Backend(app.py), and Training files(any .py file that is not app.py). 
     1. Frontend files are made using react and typescript. The structure of the fe is as follow App.tsx is a route to either AppGame(the game) or ModelView(a tool I made to see the training progess). ALL FILES GO in the frontend NEED to be in /src/ in your react app. 
     2. Backend is just app.py, nothing major for the set up of this just follow instructions below
-    3. The training files are all different AI algorithms with differing reward functions, if you want to train a model using a reward function PLEASE USE updated_train.py(this is an API built into the training logic, you need this for modelview)
+    3. The training files are all different AI algorithms with differing reward functions, if you want to train a model using a reward function PLEASE USE train.py(this is an API built into the training logic, you need this for modelview)
 
     
 
@@ -19,7 +19,7 @@ Backend Set Up:
         venv) zachhixson@Zachs-MacBook-Pro snake-back-end % python3 app.py
         (69182) wsgi starting up on http://123.0.0.1:5000 
     5. Copy the URL(http://123.0.0.1:5000) we need it for later, also your url will possible look different, that is ok! 
-    6. Last thing, if ur getting an error about not being able to find a weird file path text me, its a model but I can't put it on github cuz its too big, I will share it w u via google drive and u can download it and put it in ur backend folder and it will work! Sorry about that.
+    6. Last thing, if ur getting an error about not being able to find a weird file path message me, its a model but I can't put it on github cuz its too big, I will share it w u via google drive or email and u can download it and put it in ur backend folder and it will work! Sorry about that.
 
 Frontend Set Up: 
   1. outside of your backend(cd ..) run this npx create-react-app snake-front-end --template typescript
@@ -33,9 +33,9 @@ Frontend Set Up:
   9. you land on the AppGame page but u can switch to the model view by adding /mode_view to the url!
 
 
-Train.py Set Up(optional):
-  1. python3 updated_train.py
-  2. get the url like in BE step 5, and put it into ModelView.tsx in the server1 variable(cmd f it twin)
+Train.py Set Up:
+  1. python3 train.py (train.py lives in your backend folder)
+  2. get the url like in BE step 5, and put it into ModelView.tsx in the server1 variable
 
 
 
