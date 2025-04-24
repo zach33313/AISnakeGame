@@ -15,10 +15,10 @@ type VersusGameState = {
   mode: string,
 };
 
-const CELL_SIZE = 20;      // Each grid cell is 20x20 pixels
-const EXTRA_HEIGHT = 50;   // Extra space at bottom for snake length text
-const ip_and_port = 'http://127.0.0.1:5000/';
-const socketServerUrl = 'http://127.0.0.1:5000/';
+// Fixed canvas dimensions
+const CANVAS_WIDTH = 400;   // Fixed width in pixels
+const CANVAS_HEIGHT = 400;  // Fixed height in pixels
+const EXTRA_HEIGHT = 50;    // Extra space at bottom for snake length text
 // apple image import
 const appleImage = new Image();
 appleImage.src = appleImg;
@@ -51,11 +51,17 @@ const VersusSnakeGame: React.FC = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Calculate cell size dynamically based on grid dimensions
+    const CELL_SIZE = Math.min(
+      CANVAS_WIDTH / gameState.grid_width,
+      CANVAS_HEIGHT / gameState.grid_height
+    );
+
     const drawEyes = (x: number, y: number, outlineColor: string) => {
       const centerX = x * CELL_SIZE + CELL_SIZE / 2;
       const centerY = y * CELL_SIZE + CELL_SIZE / 2;
-      const eyeOffset = 7;
-      const eyeRadius = 6;
+      const eyeOffset = CELL_SIZE * 0.35; // Scale eye position with cell size
+      const eyeRadius = CELL_SIZE * 0.3;  // Scale eye size with cell size
 
       ctx.fillStyle = 'white';
       ctx.strokeStyle = outlineColor;
@@ -75,16 +81,14 @@ const VersusSnakeGame: React.FC = () => {
 
       ctx.fillStyle = 'black';
       ctx.beginPath();
-      ctx.arc(centerX - eyeOffset, centerY - eyeOffset, 2, 0, Math.PI * 2);
-      ctx.arc(centerX + eyeOffset, centerY - eyeOffset, 2, 0, Math.PI * 2);
+      ctx.arc(centerX - eyeOffset, centerY - eyeOffset, CELL_SIZE * 0.1, 0, Math.PI * 2);
+      ctx.arc(centerX + eyeOffset, centerY - eyeOffset, CELL_SIZE * 0.1, 0, Math.PI * 2);
       ctx.fill();
     };
 
-
-    const width = gameState.grid_width * CELL_SIZE;
-    const height = gameState.grid_height * CELL_SIZE;
-    canvas.width = width;
-    canvas.height = height + EXTRA_HEIGHT;
+    // Set canvas to fixed dimensions
+    canvas.width = CANVAS_WIDTH;
+    canvas.height = CANVAS_HEIGHT + EXTRA_HEIGHT;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // checkerboard background
@@ -98,7 +102,7 @@ const VersusSnakeGame: React.FC = () => {
     // Grid border
     ctx.strokeStyle = 'black';
     ctx.lineWidth = 2;
-    ctx.strokeRect(0, 0, width, height);
+    ctx.strokeRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     const drawSnake = (
       snake: [number, number][],
@@ -110,7 +114,7 @@ const VersusSnakeGame: React.FC = () => {
         const py = y * CELL_SIZE;
         ctx.fillStyle = index === 0 ? headColor : color;
         ctx.beginPath();
-        ctx.roundRect(px, py, CELL_SIZE, CELL_SIZE, 6);
+        ctx.roundRect(px, py, CELL_SIZE, CELL_SIZE, CELL_SIZE * 0.3);
         ctx.fill();
       });
     };
@@ -125,20 +129,15 @@ const VersusSnakeGame: React.FC = () => {
     drawEyes(px, py, '#1c5c32');
     drawEyes(aiX, aiY, '#1a4ba0');
 
-
-
     // apple image rendering
     const [ax, ay] = gameState.apple;
-    const imgSize = CELL_SIZE;
-
-    // fixes issue of apple flickering: only render if apple doesnt alr exist
     if (appleImage.complete) {
       ctx.drawImage(
         appleImage,
         ax * CELL_SIZE,
         ay * CELL_SIZE,
-        imgSize,
-        imgSize
+        CELL_SIZE,
+        CELL_SIZE
       );
     }
 
@@ -148,8 +147,8 @@ const VersusSnakeGame: React.FC = () => {
     ctx.textAlign = 'center';
     const playerLength = gameState.player_snake.length;
     const aiLength = gameState.ai_snake.length;
-    ctx.fillText(`Player Length: ${playerLength} (${playerLength - 1} apples)`, width / 2, height + 20);
-    ctx.fillText(`AI Length: ${aiLength} (${aiLength - 1} apples)`, width / 2, height + 40);
+    ctx.fillText(`Player Length: ${playerLength} (${playerLength - 1} apples)`, CANVAS_WIDTH / 2, CANVAS_HEIGHT + 20);
+    ctx.fillText(`AI Length: ${aiLength} (${aiLength - 1} apples)`, CANVAS_WIDTH / 2, CANVAS_HEIGHT + 40);
   };
 
 
@@ -194,4 +193,4 @@ const VersusSnakeGame: React.FC = () => {
   );
 };
 
-export default VersusSnakeGame;
+export default VersusSnakeGame; 
