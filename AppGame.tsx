@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import VersusSnakeGame from './VersusSnakeGame';
 import DualSnakeGame from './SnakeGame'; // Classic mode component.
-import RestartButton from './restart';
+import RestartButton from './Restart';
 import { socket } from './socket';  // Import our shared socket connection.
 import './AppGame.css';
 
@@ -69,66 +69,75 @@ const AppGame: React.FC = () => {
 
   return (
     <div className="App">
-      <h1>Snake Game</h1>
-      <div className="dropdown">
-        <img
-          src={snakeHead}
-          alt="Snake head"
-          className="snake-head"
-          onClick={toggleDropdown}
-        />
-        <div className={`tongue-container ${isOpen ? 'show' : ''}`}>
-          <img src={snakeTongue} alt="Snake tongue" className="snake-tongue" />
-          <div className="tongue-options">
-            <button
-              onClick={() => handleModeChange('classic')}
-              className="apple-button"
-            >
-              <img src={appleImg} alt="Classic" />
-              <span>Classic</span>
-            </button>
-            <button
-              onClick={() => handleModeChange('versus')}
-              className="apple-button"
-            >
-              <img src={appleImg} alt="Slither" />
-              <span>Slither</span>
-            </button>
+      <div className='sidebar'>
+        <h1>Snake Game</h1>
+        <div className="dropdown">
+          <img
+            src={snakeHead}
+            alt="Snake head"
+            className="snake-head"
+            onClick={toggleDropdown}
+          />
+          <div className={`tongue-container ${isOpen ? 'show' : ''}`}>
+            <img src={snakeTongue} alt="Snake tongue" className="snake-tongue" />
+            <div className="tongue-options">
+              <button
+                onClick={() => handleModeChange('classic')}
+                className="apple-button"
+              >
+                <img src={appleImg} alt="Classic" />
+                <span>Classic</span>
+              </button>
+              <button
+                onClick={() => handleModeChange('versus')}
+                className="apple-button"
+              >
+                <img src={appleImg} alt="Slither" />
+                <span>Slither</span>
+              </button>
+            </div>
           </div>
+        </div>
+        <div className="credits">
+          <h3>Chloe Lee</h3>
+          <h3>Zach Hixson</h3>
+          <h3>Conor Abramson-Tieu</h3>
         </div>
       </div>
 
-      <div className="settings">
-        <label>
-          <strong>Board Size:</strong>{' '}
-          <select value={selectedSize} onChange={handleSizeChange}>
-            <option value={6}>6 × 6</option>
-            <option value={10}>10 × 10</option>
-            <option value={20}>20 × 20</option>
-          </select>
-        </label>
+      <div className="main-content">
+        <div className="settings">
+          <label>
+            <strong>Board Size:</strong>{' '}
+            <select value={selectedSize} onChange={handleSizeChange}>
+              <option value={6}>6 × 6</option>
+              <option value={10}>10 × 10</option>
+              <option value={20}>20 × 20</option>
+            </select>
+          </label>
 
-        <label>
-          <strong>Opponent:</strong>{' '}
-          <select value={selectedOpponent} onChange={handleOpponentChange}>
-            <option value="A_STAR">A★ (A*)</option>
-            <option value="PPO">PPO</option>
-          </select>
-        </label>
-      </div>
+          <label>
+            <strong>Opponent:</strong>{' '}
+            <select value={selectedOpponent} onChange={handleOpponentChange}>
+              <option value="A_STAR">A★ (A*)</option>
+              <option value="PPO">PPO</option>
+            </select>
+          </label>
+        </div>
 
-      <div className="game-container">
-        {isLoading && <div className="loader" />}
-        {!isLoading && mode === 'versus' && (
-          <VersusSnakeGame key={newGameFlag} />
-        )}
-        {!isLoading && mode === 'classic' && (
-          <DualSnakeGame key={newGameFlag} />
-        )}
-      </div>
+        <div className="game-container">
+          {isLoading && <div className="loader" />}
+          {!isLoading && mode === 'versus' && (
+            <VersusSnakeGame key={newGameFlag} />
+          )}
+          {!isLoading && mode === 'classic' && (
+            <DualSnakeGame key={newGameFlag} />
+          )}
+        </div>
 
-      <div style={{ marginTop: 20 }}>
-        <RestartButton onRestart={handleRestart} />
+        <div className='restart'>
+          <RestartButton onRestart={handleRestart} />
+        </div>
       </div>
     </div>
   );
