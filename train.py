@@ -12,8 +12,8 @@ from collections import deque
 # Global settings for training
 ALLOWED_SIZES = [6, 10, 20]
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-MODEL_BASE_PATH = r"C:\Users\bdada\Downloads\trainmodel"  # Base path for models
-MODEL_FILENAME = r"C:\Users\bdada\Downloads\doesnt_exist.pth"  # Use the downloaded model
+MODEL_BASE_PATH = r"C:\Users\NAME\Downloads\trainmodel"  # Base path for models
+MODEL_FILENAME = r"C:\Users\NAME\Downloads\doesnt_exist.pth"  # Use the downloaded model
 
 # Global flags for training control
 training_thread = None
